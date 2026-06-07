@@ -3,6 +3,13 @@ files/
 # Ansible inventory (environment-specific; copy from inventory.ini.example)
 inventory.ini
 
+# Ansible secrets (AWS S3 keys; copy from secrets.yml.example)
+ansible/group_vars/webservers/secrets.yml
+
+# Ansible vars (environment-specific hostname; copy from vars.yml.example)
+ansible/group_vars/webservers/vars.yml
+
+
 # Terraform
 terraform/.terraform/
 terraform/.terraform.lock.hcl

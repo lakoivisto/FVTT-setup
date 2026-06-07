@@ -1,0 +1,6 @@
+---
+# Copy to vars.yml (gitignored) and fill in real values.
+# fvtt_hostname must match the `sslip_hostname` output from terraform
+# (derived from the Elastic IP, so it stays stable across instance recreation).
+fvtt_hostname: ""
+letsencrypt_email: ""

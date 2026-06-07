@@ -39,9 +39,11 @@ require_file() {
 
 cmd_setup() {
   cp -n "$ROOT_DIR/ansible/inventory.ini.example" "$INVENTORY"
+  cp -n "$ROOT_DIR/ansible/group_vars/webservers/secrets.yml.example" "$ROOT_DIR/ansible/group_vars/webservers/secrets.yml"
+  cp -n "$ROOT_DIR/ansible/group_vars/webservers/vars.yml.example" "$ROOT_DIR/ansible/group_vars/webservers/vars.yml"
   cp -n "$TF_DIR/terraform.tfvars.example" "$TF_DIR/terraform.tfvars"
   cp -n "$TF_DIR/backend.hcl.example" "$TF_DIR/backend.hcl"
-  echo "Copied .example files. Edit ansible/inventory.ini, terraform/terraform.tfvars and terraform/backend.hcl with your own values."
+  echo "Copied .example files. Edit ansible/inventory.ini, ansible/group_vars/webservers/secrets.yml, ansible/group_vars/webservers/vars.yml, terraform/terraform.tfvars and terraform/backend.hcl with your own values."
 }
 
 cmd_tf_init() {

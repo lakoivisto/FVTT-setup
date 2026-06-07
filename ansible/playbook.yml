@@ -8,6 +8,13 @@
     fvtt_version: "14.363"
     fvtt_zip: "FoundryVTT-Linux-{{ fvtt_version }}.zip"
 
+  handlers:
+    - name: Restart foundryvtt
+      systemd:
+        name: foundryvtt
+        state: restarted
+        daemon_reload: true
+
   tasks:
     - name: Bootstrap Python for Ansible
       raw: apt-get update -qq && apt-get install -y python3 python3-apt
@@ -41,11 +48,109 @@
         src: "{{ playbook_dir }}/../files/{{ fvtt_zip }}"
         dest: /opt/foundryvtt
       ignore_errors: "{{ ansible_check_mode }}"
+      notify: Restart foundryvtt
 
     - name: Create user data directory
       file:
         path: /opt/foundrydata
         state: directory
 
-    - name: Start FoundryVTT
-      shell: nohup node /opt/foundryvtt/resources/app/main.js --dataPath=/opt/foundrydata > /var/log/foundryvtt.log 2>&1 &
+    - name: Create FoundryVTT config directory
+      file:
+        path: /opt/foundrydata/Config
+        state: directory
+      when: "'webservers' in group_names"
+
+    - name: Read existing FoundryVTT options (if any)
+      slurp:
+        src: /opt/foundrydata/Config/options.json
+      register: fvtt_options_raw
+      failed_when: false
+      when: "'webservers' in group_names"
+
+    - name: Apply managed settings to FoundryVTT options.json
+      copy:
+        dest: /opt/foundrydata/Config/options.json
+        content: >-
+          {{
+            (fvtt_options_raw.content | default('e30=', true) | b64decode | from_json)
+            | combine({
+                'proxySSL': true,
+                'proxyPort': 443,
+                'hostname': fvtt_hostname,
+                'awsConfig': 's3config.json'
+              })
+            | to_nice_json
+          }}
+      when: "'webservers' in group_names"
+      notify: Restart foundryvtt
+
+    - name: Deploy FoundryVTT S3 asset storage config
+      template:
+        src: "{{ playbook_dir }}/templates/s3config.json.j2"
+        dest: /opt/foundrydata/Config/s3config.json
+        mode: "0600" # contains AWS secret access key
+      when: "'webservers' in group_names"
+      notify: Restart foundryvtt
+
+    - name: Deploy FoundryVTT systemd unit
+      template:
+        src: "{{ playbook_dir }}/templates/foundryvtt.service.j2"
+        dest: /etc/systemd/system/foundryvtt.service
+      notify: Restart foundryvtt
+
+    - name: Enable and start FoundryVTT service
+      systemd:
+        name: foundryvtt
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Configure HTTPS reverse proxy for FoundryVTT
+  hosts: webservers
+  gather_facts: false
+  become: true
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+  tasks:
+    - name: Install nginx and certbot
+      apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+        update_cache: true
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload nginx
+
+    - name: Deploy nginx reverse proxy config for FoundryVTT
+      template:
+        src: "{{ playbook_dir }}/templates/fvtt-nginx.conf.j2"
+        dest: /etc/nginx/sites-available/fvtt
+        force: false # certbot --nginx edits this file in place to add the SSL block + redirect; don't clobber that on reruns
+      notify: Reload nginx
+
+    - name: Enable FoundryVTT nginx site
+      file:
+        src: /etc/nginx/sites-available/fvtt
+        dest: /etc/nginx/sites-enabled/fvtt
+        state: link
+      notify: Reload nginx
+
+    - name: Obtain Let's Encrypt certificate via certbot
+      command: >
+        certbot --nginx -d {{ fvtt_hostname }}
+        --non-interactive --agree-tos --redirect
+        -m {{ letsencrypt_email }}
+      args:
+        creates: "/etc/letsencrypt/live/{{ fvtt_hostname }}/fullchain.pem"

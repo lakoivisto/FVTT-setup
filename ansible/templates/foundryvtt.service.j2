@@ -1,0 +1,15 @@
+[Unit]
+Description=FoundryVTT Virtual Tabletop
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/foundryvtt/resources/app/main.js --dataPath=/opt/foundrydata
+WorkingDirectory=/opt/foundryvtt
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/foundryvtt.log
+StandardError=append:/var/log/foundryvtt.log
+
+[Install]
+WantedBy=multi-user.target
