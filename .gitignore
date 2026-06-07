@@ -1,0 +1,12 @@
+files/
+
+# Ansible inventory (environment-specific; copy from inventory.ini.example)
+inventory.ini
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/backend.hcl

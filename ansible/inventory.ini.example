@@ -1,0 +1,8 @@
+[webservers]
+# Terraform recreates this instance with a new IP/host key on every apply, so
+# accept new host keys without prompting and don't persist them (they'd just
+# go stale on the next recreation).
+ec2-XX-XXX-XXX-XXX.eu-north-1.compute.amazonaws.com ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_ed25519 ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null'
+
+[containers]
+testbox ansible_connection=community.docker.docker ansible_docker_extra_args="--host=unix:///run/user/1000/podman/podman.sock"

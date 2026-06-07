@@ -1,0 +1,51 @@
+---
+- name: Set up FoundryVTT in container
+  hosts: all
+  gather_facts: false
+  become: true
+
+  vars:
+    fvtt_version: "14.363"
+    fvtt_zip: "FoundryVTT-Linux-{{ fvtt_version }}.zip"
+
+  tasks:
+    - name: Bootstrap Python for Ansible
+      raw: apt-get update -qq && apt-get install -y python3 python3-apt
+      changed_when: false
+      check_mode: false
+
+    - name: Install curl and dependencies
+      apt:
+        name:
+          - curl
+          - unzip
+        state: present
+        update_cache: true
+
+    - name: Add NodeSource repo for Node 24
+      raw: curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+
+    - name: Install Node 24
+      apt:
+        name: nodejs
+        state: present
+        update_cache: true
+
+    - name: Create foundryvtt directory
+      file:
+        path: /opt/foundryvtt
+        state: directory
+
+    - name: Copy zip to container & extract FoundryVTT
+      unarchive:
+        src: "{{ playbook_dir }}/../files/{{ fvtt_zip }}"
+        dest: /opt/foundryvtt
+      ignore_errors: "{{ ansible_check_mode }}"
+
+    - name: Create user data directory
+      file:
+        path: /opt/foundrydata
+        state: directory
+
+    - name: Start FoundryVTT
+      shell: nohup node /opt/foundryvtt/resources/app/main.js --dataPath=/opt/foundrydata > /var/log/foundryvtt.log 2>&1 &
