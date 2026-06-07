@@ -20,6 +20,7 @@ Terraform (EC2)
   tf-apply          terraform apply (refreshes whitelist to your current public IP)
   tf-destroy        terraform destroy
   tf-output         Show terraform outputs (e.g. public_dns for inventory.ini)
+  ssh               SSH into the EC2 host (using inventory.ini connection details)
 
 Ansible
   deploy-remote     Run the playbook against the remote EC2 host
@@ -66,6 +67,16 @@ cmd_tf_output() {
   terraform -chdir="$TF_DIR" output
 }
 
+cmd_ssh() {
+  require_file "$INVENTORY" "run './ex.sh setup' first"
+  local line host user key
+  line="$(awk '/^\[webservers\]/{getline; print; exit}' "$INVENTORY")"
+  host="$(awk '{print $1}' <<<"$line")"
+  user="$(grep -oP 'ansible_user=\K\S+' <<<"$line")"
+  key="$(grep -oP 'ansible_ssh_private_key_file=\K\S+' <<<"$line")"
+  exec ssh -i "${key/#\~/$HOME}" -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/dev/null "$user@$host"
+}
+
 cmd_deploy_remote() {
   require_file "$INVENTORY" "run './ex.sh setup' first"
   ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --limit webservers
@@ -87,6 +98,7 @@ case "${1:-}" in
   tf-apply)         cmd_tf_apply ;;
   tf-destroy)       cmd_tf_destroy ;;
   tf-output)        cmd_tf_output ;;
+  ssh)              cmd_ssh ;;
   deploy-remote)    cmd_deploy_remote ;;
   check)            cmd_check ;;
   fvtt-sync-up)     cmd_fvtt_sync_up ;;
