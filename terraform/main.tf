@@ -31,14 +31,6 @@ resource "aws_security_group" "fvtt" {
   }
 
   ingress {
-    description = "FoundryVTT"
-    from_port   = 30000
-    to_port     = 30000
-    protocol    = "tcp"
-    cidr_blocks = [var.whitelist]
-  }
-
-  ingress {
     description = "HTTP (Lets Encrypt challenge + redirect to HTTPS)"
     from_port   = 80
     to_port     = 80
