@@ -10,41 +10,51 @@ Deploys [FoundryVTT](https://foundryvtt.com/) to a remote EC2 host via Terraform
 - An S3 bucket to hold Terraform state (created once, see [backend.hcl.example](terraform/backend.hcl.example))
 - An SSH key pair (default: `~/.ssh/id_ed25519` / `~/.ssh/id_ed25519.pub`)
 - A FoundryVTT Linux release zip placed in `files/` (e.g. `files/FoundryVTT-Linux-14.363.zip`)
+- Two S3 buckets — see [S3 setup](#s3-setup) below
 
 ## 2. Setup
 
-Copy the example config files and fill in your own values — the real copies are gitignored so your host details, IP and key paths never get committed:
+Just run `./ex.sh setup` to copy all .example files at once. Then edit each file:
 
-```bash
-cp ansible/inventory.ini.example ansible/inventory.ini
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-cp terraform/backend.hcl.example terraform/backend.hcl
-```
-
-Then edit each file:
-
-- **`ansible/inventory.ini`** — under `[webservers]`, set your EC2 hostname (filled in after `terraform apply`, step 3 below) and SSH key path
-- **`terraform/terraform.tfvars`** — set `whitelist` to your public IP in CIDR form (e.g. `1.2.3.4/32`, get it with `curl -s ifconfig.me`), and `ssh_public_key_path` if your key isn't the default
 - **`terraform/backend.hcl`** — set your S3 bucket name/region for Terraform state
 
-Or just run `./ex.sh setup` to copy all three at once.
+### S3 setup
+
+Two separate S3 buckets are used:
+
+- **Asset storage** — lets FoundryVTT serve large media (maps, tokens, music, etc.) straight from S3 instead of the instance disk. Follow FoundryVTT's own [Configuring AWS S3 guide](https://foundryvtt.com/article/aws-s3/) to create the bucket, CORS policy and an IAM user, then put that user's access key/secret into `ansible/group_vars/webservers/secrets.yml` (`fvtt_s3_access_key_id` / `fvtt_s3_secret_access_key`).
+- **Data backup** — a plain bucket the EC2 instance mirrors `/opt/foundrydata/Data` to/from via `./ex.sh fvtt-sync-up` and on every service start (see [fvtt-sync-up.sh.j2](ansible/templates/fvtt-sync-up.sh.j2) / [fvtt-sync-down.sh.j2](ansible/templates/fvtt-sync-down.sh.j2)). Create it manually — it's intentionally not managed by Terraform so it persists across instance recreation — and set its name as `fvtt_backup_bucket` in `ansible/group_vars/webservers/vars.yml`. The instance reaches it via its IAM instance profile, so no keys are needed for this one.
+
+### Optional: pre-seed FoundryVTT data files
+
+Drop these into `files/` before deploying and the playbook will install them automatically, sparing you the first-run setup wizard:
+
+- **`license.json`** — a previously-activated license blob (the file FoundryVTT writes to `Config/license.json` after you enter your license key and it signs successfully against foundryvtt.com). Note the signature appears to be bound to the activating machine, so a file copied from elsewhere may still need to re-activate online once deployed.
+- **`admin.txt`** — the hashed admin password FoundryVTT writes to `Config/admin.txt` after you set one through the UI. Copy it from an existing instance to carry your admin password over to a fresh deployment.
+
+Both are deployed by the [playbook](ansible/playbook.yml) (`Pre-seed FoundryVTT license...` / `Set FoundryVTT administrator password` tasks) with `mode: "0600"` since they contain credentials.
 
 ## 3. Run it
 
 ```bash
 ./ex.sh tf-init      # one-time: terraform init -backend-config=backend.hcl
 ./ex.sh tf-apply     # creates the EC2 instance
-./ex.sh tf-output    # copy the public_dns value into ansible/inventory.ini under [webservers]
+./ex.sh tf-sync      # fills in inventory.ini and vars.yml from the terraform outputs
 ./ex.sh deploy-remote
 ```
 
-FoundryVTT will be running at `http://<public_dns>:30000`.
+FoundryVTT will be running at sslip_hostname e.g. fvtt.XX-XX-XXX-XXX.sslip.io
+
+
 
 When you're done:
 
 ```bash
+./ex.sh fvtt-sync-up
 ./ex.sh tf-destroy
 ```
+
+This will destroy your Elastic IP too (so you dont pay for it), but it means you get a new IP each time you set up again after destroying it.
 
 ### Other useful commands
 
