@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TF_DIR="$ROOT_DIR/terraform"
 INVENTORY="$ROOT_DIR/ansible/inventory.ini"
 PLAYBOOK="$ROOT_DIR/ansible/playbook.yml"
+VARS_FILE="$ROOT_DIR/ansible/group_vars/webservers/vars.yml"
 
 usage() {
   cat <<'EOF'
@@ -14,12 +15,15 @@ Usage: ./ex.sh <command>
 
 Setup
   setup             Copy .example config files to their real (gitignored) names
+  up                tf-apply + tf-sync + deploy-remote — spin up a fresh deployment end to end
+  down              fvtt-sync-up + tf-destroy — back up your data, then tear everything down
 
 Terraform (EC2)
   tf-init           terraform init -backend-config=backend.hcl
   tf-apply          terraform apply (refreshes whitelist to your current public IP)
   tf-destroy        terraform destroy
   tf-output         Show terraform outputs (e.g. public_dns for inventory.ini)
+  tf-sync           Fill in inventory.ini and vars.yml from terraform outputs
   ssh               SSH into the EC2 host (using inventory.ini connection details)
 
 Ansible
@@ -49,6 +53,17 @@ cmd_setup() {
   echo "Copied .example files. Edit ansible/inventory.ini, ansible/group_vars/webservers/secrets.yml, ansible/group_vars/webservers/vars.yml, terraform/terraform.tfvars and terraform/backend.hcl with your own values."
 }
 
+cmd_up() {
+  cmd_tf_apply
+  cmd_tf_sync
+  cmd_deploy_remote
+}
+
+cmd_down() {
+  cmd_fvtt_sync_up
+  cmd_tf_destroy
+}
+
 cmd_tf_init() {
   require_file "$TF_DIR/backend.hcl" "run './ex.sh setup' first"
   terraform -chdir="$TF_DIR" init -backend-config=backend.hcl
@@ -65,6 +80,21 @@ cmd_tf_destroy() {
 
 cmd_tf_output() {
   terraform -chdir="$TF_DIR" output
+}
+
+cmd_tf_sync() {
+  require_file "$INVENTORY" "run './ex.sh setup' first"
+  require_file "$VARS_FILE" "run './ex.sh setup' first"
+  local public_dns sslip_hostname
+  public_dns="$(terraform -chdir="$TF_DIR" output -raw public_dns)"
+  sslip_hostname="$(terraform -chdir="$TF_DIR" output -raw sslip_hostname)"
+
+  # Replace just the hostname (first field) on the [webservers] host line, keeping ansible_* args intact
+  sed -i "/^\[webservers\]/{n; s|^[^ ]*|$public_dns|}" "$INVENTORY"
+  sed -i "s|^fvtt_hostname:.*|fvtt_hostname: \"$sslip_hostname\"|" "$VARS_FILE"
+
+  echo "inventory.ini [webservers] host -> $public_dns"
+  echo "vars.yml fvtt_hostname          -> $sslip_hostname"
 }
 
 cmd_ssh() {
@@ -94,10 +124,13 @@ cmd_fvtt_sync_up() {
 
 case "${1:-}" in
   setup)            cmd_setup ;;
+  up)               cmd_up ;;
+  down)             cmd_down ;;
   tf-init)          cmd_tf_init ;;
   tf-apply)         cmd_tf_apply ;;
   tf-destroy)       cmd_tf_destroy ;;
   tf-output)        cmd_tf_output ;;
+  tf-sync)          cmd_tf_sync ;;
   ssh)              cmd_ssh ;;
   deploy-remote)    cmd_deploy_remote ;;
   check)            cmd_check ;;

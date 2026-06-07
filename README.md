@@ -38,6 +38,12 @@ Both are deployed by the [playbook](ansible/playbook.yml) (`Pre-seed FoundryVTT 
 
 ```bash
 ./ex.sh tf-init      # one-time: terraform init -backend-config=backend.hcl
+./ex.sh up           # tf-apply + tf-sync + deploy-remote, end to end
+```
+
+Or run each step yourself if you want more control:
+
+```bash
 ./ex.sh tf-apply     # creates the EC2 instance
 ./ex.sh tf-sync      # fills in inventory.ini and vars.yml from the terraform outputs
 ./ex.sh deploy-remote
@@ -53,6 +59,13 @@ When you're done:
 ./ex.sh fvtt-sync-up
 ./ex.sh tf-destroy
 ```
+
+Or just:
+
+```bash
+./ex.sh down         # fvtt-sync-up + tf-destroy, backs up your data before tearing down
+```
+
 
 This will destroy your Elastic IP too (so you dont pay for it), but it means you get a new IP each time you set up again after destroying it.
 
