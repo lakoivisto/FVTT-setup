@@ -60,6 +60,20 @@
         path: /opt/foundrydata/Config
         state: directory
 
+    - name: Pre-seed FoundryVTT license to skip online activation
+      copy:
+        src: "{{ playbook_dir }}/../files/license.json"
+        dest: /opt/foundrydata/Config/license.json
+        mode: "0600" 
+      notify: Restart foundryvtt
+
+    - name: Set FoundryVTT administrator password
+      copy:
+        src: "{{ playbook_dir }}/../files/admin.txt"
+        dest: /opt/foundrydata/Config/admin.txt
+        mode: "0600" 
+      notify: Restart foundryvtt
+
     - name: Read existing FoundryVTT options (if any)
       slurp:
         src: /opt/foundrydata/Config/options.json
@@ -86,7 +100,7 @@
       template:
         src: "{{ playbook_dir }}/templates/s3config.json.j2"
         dest: /opt/foundrydata/Config/s3config.json
-        mode: "0600" # contains AWS secret access key
+        mode: "0600"
       notify: Restart foundryvtt
 
     - name: Install AWS CLI v2 for foundrydata backup sync
