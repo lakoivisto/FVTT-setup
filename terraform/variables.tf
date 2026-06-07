@@ -16,3 +16,8 @@ variable "ssh_public_key_path" {
   type        = string
   default     = "~/.ssh/id_ed25519.pub"
 }
+
+variable "foundrydata_backup_bucket" {
+  description = "Name of the manually-created S3 bucket used to back up /opt/foundrydata/Data (not managed by Terraform — must persist across instance recreation)"
+  type        = string
+}

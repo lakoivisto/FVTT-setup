@@ -54,11 +54,51 @@ resource "aws_security_group" "fvtt" {
   }
 }
 
+data "aws_iam_policy_document" "fvtt_backup_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "fvtt_backup" {
+  name               = "fvtt-backup-role"
+  assume_role_policy = data.aws_iam_policy_document.fvtt_backup_assume_role.json
+}
+
+data "aws_iam_policy_document" "fvtt_backup_s3" {
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::${var.foundrydata_backup_bucket}"]
+  }
+
+  statement {
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["arn:aws:s3:::${var.foundrydata_backup_bucket}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "fvtt_backup_s3" {
+  name   = "fvtt-backup-s3-access"
+  role   = aws_iam_role.fvtt_backup.id
+  policy = data.aws_iam_policy_document.fvtt_backup_s3.json
+}
+
+resource "aws_iam_instance_profile" "fvtt_backup" {
+  name = "fvtt-backup-profile"
+  role = aws_iam_role.fvtt_backup.name
+}
+
 resource "aws_instance" "fvtt" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   key_name               = aws_key_pair.fvtt.key_name
   vpc_security_group_ids = [aws_security_group.fvtt.id]
+  iam_instance_profile   = aws_iam_instance_profile.fvtt_backup.name
 
   root_block_device {
     volume_size = 8

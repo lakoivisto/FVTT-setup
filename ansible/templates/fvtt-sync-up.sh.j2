@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Mirrors the local FoundryVTT data dir up to S3 (--delete makes the bucket
+# match local exactly). Run manually after a session via ./ex.sh fvtt-sync-up.
+# Credentials come from the EC2 instance profile (no keys on disk).
+set -euo pipefail
+
+aws s3 sync /opt/foundrydata/Data/ "s3://{{ fvtt_backup_bucket }}/Data/" --delete --region eu-north-1

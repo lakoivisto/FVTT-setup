@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Pulls FoundryVTT world/system/module data from S3 into the local data dir.
+# Additive only (no --delete) — never removes local files, so it's safe to
+# run on every service start without risking data loss from a stale bucket.
+# Credentials come from the EC2 instance profile (no keys on disk).
+set -euo pipefail
+
+aws s3 sync "s3://{{ fvtt_backup_bucket }}/Data/" /opt/foundrydata/Data/ --region eu-north-1

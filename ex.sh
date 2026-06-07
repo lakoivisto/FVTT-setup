@@ -22,9 +22,11 @@ Terraform (EC2)
   tf-output         Show terraform outputs (e.g. public_dns for inventory.ini)
 
 Ansible
-  deploy-container  Run the playbook against the local Podman/Docker container
   deploy-remote     Run the playbook against the remote EC2 host
   check             Dry run (--check) of the playbook
+
+Backup
+  fvtt-sync-up      Mirror /opt/foundrydata/Data up to the S3 backup bucket
 
 EOF
 }
@@ -64,11 +66,6 @@ cmd_tf_output() {
   terraform -chdir="$TF_DIR" output
 }
 
-cmd_deploy_container() {
-  require_file "$INVENTORY" "run './ex.sh setup' first"
-  ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --limit containers
-}
-
 cmd_deploy_remote() {
   require_file "$INVENTORY" "run './ex.sh setup' first"
   ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --limit webservers
@@ -79,15 +76,20 @@ cmd_check() {
   ansible-playbook -i "$INVENTORY" "$PLAYBOOK" --check
 }
 
+cmd_fvtt_sync_up() {
+  require_file "$INVENTORY" "run './ex.sh setup' first"
+  ansible -i "$INVENTORY" webservers --become -m command -a /usr/local/bin/fvtt-sync-up.sh
+}
+
 case "${1:-}" in
   setup)            cmd_setup ;;
   tf-init)          cmd_tf_init ;;
   tf-apply)         cmd_tf_apply ;;
   tf-destroy)       cmd_tf_destroy ;;
   tf-output)        cmd_tf_output ;;
-  deploy-container) cmd_deploy_container ;;
   deploy-remote)    cmd_deploy_remote ;;
   check)            cmd_check ;;
+  fvtt-sync-up)     cmd_fvtt_sync_up ;;
   -h|--help|help|"") usage ;;
   *)
     echo "Unknown command: $1" >&2

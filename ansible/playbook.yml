@@ -1,6 +1,6 @@
 ---
-- name: Set up FoundryVTT in container
-  hosts: all
+- name: Set up FoundryVTT
+  hosts: webservers
   gather_facts: false
   become: true
 
@@ -43,7 +43,7 @@
         path: /opt/foundryvtt
         state: directory
 
-    - name: Copy zip to container & extract FoundryVTT
+    - name: Copy zip & extract FoundryVTT
       unarchive:
         src: "{{ playbook_dir }}/../files/{{ fvtt_zip }}"
         dest: /opt/foundryvtt
@@ -59,14 +59,12 @@
       file:
         path: /opt/foundrydata/Config
         state: directory
-      when: "'webservers' in group_names"
 
     - name: Read existing FoundryVTT options (if any)
       slurp:
         src: /opt/foundrydata/Config/options.json
       register: fvtt_options_raw
       failed_when: false
-      when: "'webservers' in group_names"
 
     - name: Apply managed settings to FoundryVTT options.json
       copy:
@@ -82,7 +80,6 @@
               })
             | to_nice_json
           }}
-      when: "'webservers' in group_names"
       notify: Restart foundryvtt
 
     - name: Deploy FoundryVTT S3 asset storage config
@@ -90,8 +87,25 @@
         src: "{{ playbook_dir }}/templates/s3config.json.j2"
         dest: /opt/foundrydata/Config/s3config.json
         mode: "0600" # contains AWS secret access key
-      when: "'webservers' in group_names"
       notify: Restart foundryvtt
+
+    - name: Install AWS CLI v2 for foundrydata backup sync
+      shell: |
+        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+        unzip -q -o /tmp/awscliv2.zip -d /tmp
+        /tmp/aws/install
+        rm -rf /tmp/awscliv2.zip /tmp/aws
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Deploy foundrydata S3 sync scripts
+      template:
+        src: "{{ playbook_dir }}/templates/{{ item }}.j2"
+        dest: "/usr/local/bin/{{ item }}"
+        mode: "0755"
+      loop:
+        - fvtt-sync-down.sh
+        - fvtt-sync-up.sh
 
     - name: Deploy FoundryVTT systemd unit
       template:

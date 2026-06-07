@@ -4,3 +4,7 @@
 # (derived from the Elastic IP, so it stays stable across instance recreation).
 fvtt_hostname: ""
 letsencrypt_email: ""
+
+# S3 bucket for backing up /opt/foundrydata/Data (created manually — not
+# managed by Terraform — so it persists across instance recreation).
+fvtt_backup_bucket: "foundrydata-bucket"

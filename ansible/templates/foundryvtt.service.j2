@@ -4,6 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
+ExecStartPre=-/usr/local/bin/fvtt-sync-down.sh
 ExecStart=/usr/bin/node /opt/foundryvtt/resources/app/main.js --dataPath=/opt/foundrydata
 WorkingDirectory=/opt/foundryvtt
 Restart=always

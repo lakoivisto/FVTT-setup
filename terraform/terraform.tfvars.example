@@ -4,6 +4,7 @@
 # Your public IP in CIDR notation, used to restrict SSH/FoundryVTT access.
 # Get it with: curl -s ifconfig.me
 whitelist = "1.2.3.4/32"
+foundrydata_backup_bucket = "foundrydata-bucket"
 
 # Optional overrides (defaults shown):
 # aws_region          = "eu-north-1"
