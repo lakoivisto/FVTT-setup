@@ -90,7 +90,8 @@
                 'proxySSL': true,
                 'proxyPort': 443,
                 'hostname': fvtt_hostname,
-                'awsConfig': 's3config.json'
+                'awsConfig': 's3config.json',
+                'telemetry': false
               })
             | to_nice_json
           }}
