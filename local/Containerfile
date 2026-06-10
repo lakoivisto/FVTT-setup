@@ -1,0 +1,37 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install -y curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 24
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# AWS CLI v2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip \
+    && unzip /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# FoundryVTT (zip must be present in files/ before building)
+COPY files/FoundryVTT-Linux-*.zip /tmp/foundryvtt.zip
+RUN mkdir -p /opt/foundryvtt \
+    && unzip /tmp/foundryvtt.zip -d /opt/foundryvtt \
+    && rm /tmp/foundryvtt.zip
+
+# Pre-seed license and admin password
+RUN mkdir -p /opt/foundrydata/Config
+COPY files/license.json /opt/foundrydata/Config/license.json
+COPY files/admin.txt /opt/foundrydata/Config/admin.txt
+
+COPY local/fvtt-sync-down.sh local/fvtt-sync-up.sh /usr/local/bin/
+COPY local/entrypoint.sh /entrypoint.sh
+RUN chmod +x /usr/local/bin/fvtt-sync-down.sh /usr/local/bin/fvtt-sync-up.sh /entrypoint.sh
+
+EXPOSE 30000
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,4 +1,5 @@
 files/
+local/local.env
 
 # Ansible inventory (environment-specific; copy from inventory.ini.example)
 inventory.ini

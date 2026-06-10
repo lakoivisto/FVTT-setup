@@ -8,6 +8,9 @@ TF_DIR="$ROOT_DIR/terraform"
 INVENTORY="$ROOT_DIR/ansible/inventory.ini"
 PLAYBOOK="$ROOT_DIR/ansible/playbook.yml"
 VARS_FILE="$ROOT_DIR/ansible/group_vars/webservers/vars.yml"
+LOCAL_IMAGE="fvtt:local"
+LOCAL_CONTAINER="fvtt-local"
+LOCAL_ENV_FILE="$ROOT_DIR/local/local.env"
 
 usage() {
   cat <<'EOF'
@@ -33,6 +36,13 @@ Ansible
 Backup
   fvtt-sync-up      Mirror /opt/foundrydata/Data up to the S3 backup bucket
 
+Local (container)
+  local-up          Build image (if needed) + start container, syncs world data from S3 first
+  local-down        Sync world data to S3, then stop and remove the container
+  local-sync-up     Mirror world data to S3 without stopping the container
+  local-build       Build the container image (fvtt:local)
+  local-shell       Open a shell in the running local container
+
 EOF
 }
 
@@ -50,7 +60,8 @@ cmd_setup() {
   cp -n "$ROOT_DIR/ansible/group_vars/webservers/vars.yml.example" "$ROOT_DIR/ansible/group_vars/webservers/vars.yml"
   cp -n "$TF_DIR/terraform.tfvars.example" "$TF_DIR/terraform.tfvars"
   cp -n "$TF_DIR/backend.hcl.example" "$TF_DIR/backend.hcl"
-  echo "Copied .example files. Edit ansible/inventory.ini, ansible/group_vars/webservers/secrets.yml, ansible/group_vars/webservers/vars.yml, terraform/terraform.tfvars and terraform/backend.hcl with your own values."
+  cp -n "$ROOT_DIR/local/local.env.example" "$LOCAL_ENV_FILE"
+  echo "Copied .example files. Edit ansible/inventory.ini, ansible/group_vars/webservers/secrets.yml, ansible/group_vars/webservers/vars.yml, terraform/terraform.tfvars, terraform/backend.hcl, and local/local.env with your own values."
 }
 
 cmd_up() {
@@ -122,6 +133,38 @@ cmd_fvtt_sync_up() {
   ansible -i "$INVENTORY" webservers --become -m command -a /usr/local/bin/fvtt-sync-up.sh
 }
 
+cmd_local_build() {
+  podman build -f "$ROOT_DIR/local/Containerfile" -t "$LOCAL_IMAGE" "$ROOT_DIR"
+}
+
+cmd_local_up() {
+  require_file "$LOCAL_ENV_FILE" "copy local/local.env.example to local/local.env and fill in values"
+  if ! podman image exists "$LOCAL_IMAGE" 2>/dev/null; then
+    cmd_local_build
+  fi
+  podman run -d \
+    --name "$LOCAL_CONTAINER" \
+    --env-file "$LOCAL_ENV_FILE" \
+    -v "${HOME}/.aws:/root/.aws:ro" \
+    -p 30000:30000 \
+    "$LOCAL_IMAGE"
+  echo "FoundryVTT running at http://localhost:30000"
+}
+
+cmd_local_sync_up() {
+  podman exec "$LOCAL_CONTAINER" /usr/local/bin/fvtt-sync-up.sh
+}
+
+cmd_local_down() {
+  cmd_local_sync_up
+  podman stop "$LOCAL_CONTAINER"
+  podman rm "$LOCAL_CONTAINER"
+}
+
+cmd_local_shell() {
+  podman exec -it "$LOCAL_CONTAINER" bash
+}
+
 case "${1:-}" in
   setup)            cmd_setup ;;
   up)               cmd_up ;;
@@ -135,6 +178,11 @@ case "${1:-}" in
   deploy-remote)    cmd_deploy_remote ;;
   check)            cmd_check ;;
   fvtt-sync-up)     cmd_fvtt_sync_up ;;
+  local-build)      cmd_local_build ;;
+  local-up)         cmd_local_up ;;
+  local-down)       cmd_local_down ;;
+  local-sync-up)    cmd_local_sync_up ;;
+  local-shell)      cmd_local_shell ;;
   -h|--help|help|"") usage ;;
   *)
     echo "Unknown command: $1" >&2
