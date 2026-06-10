@@ -109,11 +109,3 @@ resource "aws_instance" "fvtt" {
   }
 }
 
-resource "aws_eip" "fvtt" {
-  instance = aws_instance.fvtt.id
-  domain   = "vpc"
-
-  tags = {
-    Name = "fvtt"
-  }
-}
