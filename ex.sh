@@ -139,6 +139,13 @@ cmd_local_build() {
 
 cmd_local_up() {
   require_file "$LOCAL_ENV_FILE" "copy local/local.env.example to local/local.env and fill in values"
+  # Reuse a leftover container (e.g. stopped by a reboot) instead of removing it:
+  # its data dir may hold changes that were never synced up to S3.
+  if podman container exists "$LOCAL_CONTAINER"; then
+    podman start "$LOCAL_CONTAINER"
+    echo "FoundryVTT running at http://localhost:30000 (existing container restarted)"
+    return
+  fi
   if ! podman image exists "$LOCAL_IMAGE" 2>/dev/null; then
     cmd_local_build
   fi
